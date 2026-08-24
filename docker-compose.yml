@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ai-dba-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ai_dba
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d ai_dba"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

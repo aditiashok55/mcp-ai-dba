@@ -1,0 +1,4 @@
+mcp
+psycopg[binary]
+pydantic
+python-dotenv
