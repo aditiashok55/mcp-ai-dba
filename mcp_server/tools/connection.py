@@ -1,21 +1,13 @@
-from mcp_server.db import get_connection
+"""Trivial reachability probe — proves the full pipeline works."""
+from __future__ import annotations
+
+from mcp_server.db import connect
+from mcp_server.tools.base import dba_tool
 
 
+@dba_tool(name="check_database_connection")
 def check_database_connection() -> dict:
-    try:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1;")
-                result = cursor.fetchone()
-
-        return {
-            "status": "healthy",
-            "database_reachable": result == (1,),
-        }
-
-    except Exception as exc:
-        return {
-            "status": "unhealthy",
-            "database_reachable": False,
-            "error": str(exc),
-        }
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 AS ok;")
+        row = cur.fetchone()
+    return {"database_reachable": row is not None and row.get("ok") == 1}

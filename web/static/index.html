@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI-DBA</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🩺 AI-DBA</h1>
+    <p class="tagline">A <strong>diagnostic tool</strong>, not a chatbot.
+      Describe a PostgreSQL symptom — the agent runs read-only tools and
+      returns a structured diagnosis with cited evidence. One question
+      in, one diagnosis out.</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <textarea id="question"
+                placeholder="Describe a symptom, e.g. 'queries are slow', 'connections stuck', 'suspected lock contention'"
+                rows="3"></textarea>
+      <div class="row">
+        <label>
+          Engine:
+          <select id="llm">
+            <option value="rule">rule-based (offline, no key)</option>
+            <option value="anthropic">Claude</option>
+            <option value="openai">OpenAI (GPT-4o / gpt-4o-mini)</option>
+            <option value="ollama">Ollama (local)</option>
+          </select>
+        </label>
+        <label>
+          Max steps:
+          <input id="max-steps" type="number" min="1" max="20" value="8" />
+        </label>
+        <button id="run" type="button">Diagnose</button>
+      </div>
+      <div class="samples">
+        <span>Try:</span>
+        <button class="chip" data-q="Is the database reachable?">reachability</button>
+        <button class="chip" data-q="Are there any slow queries running right now?">slow queries</button>
+        <button class="chip" data-q="Investigate lock contention.">locks</button>
+        <button class="chip" data-q="The database feels unhealthy. Investigate and diagnose.">general triage</button>
+      </div>
+      <div class="samples demo-row">
+        <span>Demo mode — inject a real problem, then diagnose:</span>
+        <button class="chip demo" data-scenario="slow_query">🐢 slow query</button>
+        <button class="chip demo" data-scenario="lock_contention">🔒 lock contention</button>
+        <button class="chip demo" data-scenario="idle_in_transaction">💤 idle-in-txn</button>
+      </div>
+    </section>
+
+    <section id="status" class="status hidden"></section>
+
+    <section id="result" class="hidden">
+      <div class="summary-card">
+        <h2>Summary</h2>
+        <p id="summary"></p>
+      </div>
+
+      <h2>Findings</h2>
+      <div id="findings"></div>
+
+      <h2>Tool calls</h2>
+      <div id="tools"></div>
+
+      <details class="raw">
+        <summary>Raw JSON</summary>
+        <pre id="raw"></pre>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <a href="http://localhost:9090" target="_blank" rel="noreferrer">Prometheus</a>
+    ·
+    <a href="http://localhost:3000" target="_blank" rel="noreferrer">Grafana</a>
+    ·
+    <a href="https://github.com/aditiashok55/mcp-ai-dba" target="_blank" rel="noreferrer">Source</a>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

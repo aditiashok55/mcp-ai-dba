@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "ai-dba"
+    static_configs:
+      # host.docker.internal resolves to the host on Docker Desktop
+      # (macOS + Windows). On Linux, use `--add-host=host.docker.internal:host-gateway`
+      # or replace with your host IP.
+      - targets: ["host.docker.internal:9108"]

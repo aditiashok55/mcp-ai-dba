@@ -1,4 +1,17 @@
-mcp
-psycopg[binary]
-pydantic
-python-dotenv
+mcp>=1.0,<2.0
+psycopg[binary]>=3.1
+pydantic>=2.6
+python-dotenv>=1.0
+prometheus-client>=0.20
+
+# --- web UI ---
+fastapi>=0.110
+uvicorn[standard]>=0.30
+
+# --- agent LLM (optional; only needed to actually run against a real LLM) ---
+anthropic>=0.34
+openai>=1.40
+# Ollama uses stdlib urllib — no dependency required.
+
+# --- dev / test ---
+pytest>=8.0

@@ -86,9 +86,59 @@ Ordered by build complexity, not necessarily usage order:
 3. `get_active_connections()` — list of current connections with state (active/idle/idle in transaction) — this is what surfaces connection leaks.
 4. `get_slow_queries()` — from `pg_stat_statements` or `pg_stat_activity` for currently-running long queries. This is your centerpiece diagnostic tool.
 5. `get_lock_information()` — blocking/blocked query pairs from `pg_locks`/`pg_stat_activity`. Great story for "how would you debug contention at scale."
-6. `explain_query(query_id_or_text)` — trickiest one from a security standpoint (accepts a query as input) — good vehicle to demonstrate strict validation (EXPLAIN only, no execution, length caps, no semicolons, etc.).
+6. `explain_slow_query(query_id)` — restricted redesign of the free-text `explain_query`: looks up the query text from `pg_stat_statements` by ID so the LLM never supplies free text. Avoids the risks of arbitrary EXPLAIN input (data leakage via functions in the plan, accidental `EXPLAIN ANALYZE` execution). Much cleaner security story.
 7. `get_table_statistics()` — table sizes, dead tuples, last vacuum/analyze — ties into "why is this slow" as a secondary cause.
-8. `get_recent_errors()` — requires log access or an errors table you seed; lowest priority, can be stubbed/simulated if Postgres log parsing is too heavy for V1.
+8. `get_index_usage()` — from `pg_stat_user_indexes`; pairs with `get_table_statistics` for the missing-index scenario and is cheap to build.
+9. `get_recent_errors()` — requires log access or an errors table you seed; lowest priority, can be stubbed/simulated if Postgres log parsing is too heavy for V1.
+10. `find_similar_incidents(symptom_description)` — (stretch goal) semantic search over past incident diagnoses via `pgvector`. Each completed diagnosis is embedded and stored; the agent retrieves similar past cases as evidence. A genuine RAG-in-an-agent story, not a bolt-on vector feature.
+// ...existing code...
+- **Prompt injection**: since tools are fixed and parameterized, the main injection risk is the LLM being tricked into calling a tool with a malicious *parameter* (e.g., an injected instruction inside DB data telling the agent to call a tool with a destructive-looking argument). Mitigation: validate every parameter server-side regardless of what the LLM intended, and never let tool *output* be treated as instructions in the next planning step without sanitization.
+- **Rate limiting per tool** on the MCP server — caps a runaway agent loop and adds another defense-in-depth layer.
+- **Correlation IDs**: thread a request ID from user question → every tool call → audit log → Grafana. Trivial to add early, painful to retrofit — build it in from day one.
+- **No write tools in V1**, full stop. If you add remediation later, it goes through an explicit human-approval step, logged separately, and probably deserves its own dedicated tool with a much narrower blast radius (e.g., `kill_connection(pid)` with confirmation, not `run_sql(anything)`).
+
+## 5.5 Structured Diagnosis Output
+
+The agent must emit a structured diagnosis, not prose:
+
+```json
+{
+  "finding": "Lock contention on orders table",
+  "evidence": ["tool_call_3", "tool_call_5"],
+  "confidence": "high",
+  "recommended_action": "Investigate idle-in-transaction session pid 4132"
+}
+```
+
+This makes "evidence vs. assumption" enforceable and testable — every finding must cite tool-call IDs — and the structured records feed the `find_similar_incidents` embedding store.
+
+## 5.6 Eval Harness
+
+Since chaos scenarios are reproducible, add a small eval suite: run each scenario N times and score whether the agent reached the correct root cause. Track diagnosis accuracy per scenario. "I measured diagnosis accuracy" is a far stronger interview line than "it usually works."
+// ...existing code...
+**V1 (this project's real target):**
+
+- Postgres only
+- Read-only tools 1–8 above (skip `get_recent_errors` if log parsing gets heavy)
+- Structured diagnosis output schema (findings must cite evidence)
+- Eval harness scoring diagnosis accuracy across chaos scenarios
+- Correlation IDs threaded through agent → tools → audit log → metrics
+- Fixed API-based LLM (see cost note below)
+- Docker Compose local environment with chaos scripts
+- Structured audit logging + basic Prometheus/Grafana
+- pytest coverage: unit, tool-level, permission/security, and at least a few adversarial-input tests
+
+**V2 (explicitly out of scope until V1 is solid):**
+
+- `pgvector` incident memory + `find_similar_incidents` (promote to V1 only if time allows)
+- Oracle support (multi-engine abstraction)
+- MongoDB support — deliberately deferred; multi-engine diagnostics (`currentOp`/`serverStatus` vs. `pg_stat_*`) is real abstraction work, and the "vector DB" angle is better served by `pgvector` inside the existing Postgres
+- Any write/remediation tools with approval workflow
+- Cloud deployment
+- Multi-database fleet view (the "1000 databases" scaling story stays theoretical/design-doc for now, not implemented)
+// ...existing code...
+- **Days 16–18**: Phase 7 testing sweep, especially adversarial/permission tests + eval harness runs across all chaos scenarios.
+
 
 ## 5. Security Model
 

@@ -1,0 +1,54 @@
+{
+  "uid": "ai-dba",
+  "title": "AI-DBA Tools",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Tool call rate (per tool, per status)",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (tool, status) (rate(aidba_tool_calls_total[1m]))",
+          "legendFormat": "{{tool}} · {{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool latency p95 (seconds)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, tool) (rate(aidba_tool_call_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{tool}} p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "In-flight calls",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "aidba_tool_calls_in_flight",
+          "legendFormat": "{{tool}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Failure ratio (non-ok / total)",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (tool) (rate(aidba_tool_calls_total{status!=\"ok\"}[5m])) / clamp_min(sum by (tool) (rate(aidba_tool_calls_total[5m])), 0.001)",
+          "legendFormat": "{{tool}}"
+        }
+      ]
+    }
+  ]
+}

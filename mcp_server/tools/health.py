@@ -1,66 +1,29 @@
-from mcp_server.db import get_connection
+"""Composite vitals — version, uptime, connection counts."""
+from __future__ import annotations
+
+from mcp_server.db import connect
+from mcp_server.tools.base import dba_tool
 
 
+_HEALTH_SQL = """
+SELECT
+    current_database()                              AS database,
+    version()                                       AS version,
+    current_setting('max_connections')::int         AS max_connections,
+    (SELECT count(*) FROM pg_stat_activity)         AS current_connections,
+    (SELECT count(*) FROM pg_stat_activity
+       WHERE state = 'active')                      AS active_connections,
+    (SELECT count(*) FROM pg_stat_activity
+       WHERE state = 'idle')                        AS idle_connections,
+    (SELECT count(*) FROM pg_stat_activity
+       WHERE state = 'idle in transaction')         AS idle_in_transaction,
+    (now() - pg_postmaster_start_time())::text      AS uptime;
+"""
+
+
+@dba_tool(name="get_database_health")
 def get_database_health() -> dict:
-    try:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-
-                cursor.execute("SELECT version();")
-                version = cursor.fetchone()[0]
-
-                cursor.execute("SELECT current_database();")
-                database = cursor.fetchone()[0]
-
-                cursor.execute("SHOW max_connections;")
-                max_connections = int(cursor.fetchone()[0])
-
-                cursor.execute(
-                    """
-                    SELECT COUNT(*)
-                    FROM pg_stat_activity;
-                    """
-                )
-                current_connections = cursor.fetchone()[0]
-
-                cursor.execute(
-                    """
-                    SELECT COUNT(*)
-                    FROM pg_stat_activity
-                    WHERE state = 'active';
-                    """
-                )
-                active_connections = cursor.fetchone()[0]
-
-                cursor.execute(
-                    """
-                    SELECT COUNT(*)
-                    FROM pg_stat_activity
-                    WHERE state = 'idle';
-                    """
-                )
-                idle_connections = cursor.fetchone()[0]
-
-                cursor.execute(
-                    """
-                    SELECT now() - pg_postmaster_start_time();
-                    """
-                )
-                uptime = str(cursor.fetchone()[0])
-
-        return {
-            "status": "healthy",
-            "database": database,
-            "version": version,
-            "max_connections": max_connections,
-            "current_connections": current_connections,
-            "active_connections": active_connections,
-            "idle_connections": idle_connections,
-            "uptime": uptime,
-        }
-
-    except Exception as exc:
-        return {
-            "status": "unhealthy",
-            "error": str(exc),
-        }
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute(_HEALTH_SQL)
+        row = cur.fetchone() or {}
+    return {"health": row}

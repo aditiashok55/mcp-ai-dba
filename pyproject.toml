@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+pythonpath = ["."]
+markers = [
+    "integration: requires a running Postgres (set AI_DBA_INTEGRATION=1)",
+]
